@@ -29,7 +29,13 @@ from models.api_models import (
     # Risk Analysis Models
     RiskAnalysisRequest, CompleteRiskAnalysisResponse,
     RiskContributionResponse, CorrelationResponse, 
-    EfficientFrontierResponse, PortfolioMetricsResponse
+    EfficientFrontierResponse, PortfolioMetricsResponse,
+    # Chainlink MCP Models
+    ChainlinkPriceFeedResponse, ChainlinkMultiplePricesResponse,
+    ChainlinkHistoricalPricesResponse, ChainlinkVolatilityResponse,
+    ChainlinkCrossChainPricesResponse, ChainlinkSupportedFeedsResponse,
+    ChainlinkFeedHealthResponse, ChainlinkNetworkStatusResponse,
+    ChainlinkHealthCheckResponse
 )
 from config import settings
 
@@ -613,6 +619,276 @@ async def get_efficient_frontier(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Efficient frontier analysis failed: {str(e)}")
+
+
+# Chainlink MCP endpoints
+from chainlink_mcp_service import chainlink_mcp_service
+
+@app.get("/chainlink/health", response_model=ChainlinkHealthCheckResponse, tags=["Chainlink MCP"])
+async def chainlink_health_check():
+    """
+    Check Chainlink MCP service health and connectivity
+    """
+    try:
+        async with chainlink_mcp_service as service:
+            health_data = await service.health_check()
+            return ChainlinkHealthCheckResponse(**health_data)
+    except Exception as e:
+        logger.error(f"Chainlink health check failed: {e}")
+        raise HTTPException(status_code=503, detail="Chainlink MCP service unavailable")
+
+
+@app.get("/chainlink/price/{symbol}", response_model=ChainlinkPriceFeedResponse, tags=["Chainlink MCP"])
+async def get_chainlink_price(
+    symbol: str = Path(..., description="Price pair symbol (e.g., ETH/USD)"),
+    chain: str = Query("ethereum", description="Blockchain network")
+):
+    """
+    Get current price from Chainlink price feed
+    
+    - **symbol**: Price pair symbol (ETH/USD, BTC/USD, etc.)
+    - **chain**: Blockchain network (ethereum, polygon, arbitrum, base)
+    """
+    try:
+        async with chainlink_mcp_service as service:
+            price_data = await service.get_price_feed(symbol, chain)
+            
+            if not price_data:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Price feed {symbol} not available on {chain}"
+                )
+                
+            return ChainlinkPriceFeedResponse(**price_data)
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching Chainlink price for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch price: {str(e)}")
+
+
+@app.get("/chainlink/prices", response_model=ChainlinkMultiplePricesResponse, tags=["Chainlink MCP"])
+async def get_chainlink_multiple_prices(
+    symbols: List[str] = Query(..., description="Price pair symbols"),
+    chain: str = Query("ethereum", description="Blockchain network")
+):
+    """
+    Get multiple price feeds from Chainlink in parallel
+    
+    - **symbols**: List of price pair symbols (ETH/USD, BTC/USD, etc.)
+    - **chain**: Blockchain network (ethereum, polygon, arbitrum, base)
+    """
+    try:
+        if len(symbols) > 10:
+            raise HTTPException(
+                status_code=400,
+                detail="Maximum 10 symbols per request"
+            )
+            
+        async with chainlink_mcp_service as service:
+            price_data = await service.get_multiple_prices(symbols, chain)
+            
+            return ChainlinkMultiplePricesResponse(
+                prices=price_data,
+                chain=chain
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching multiple Chainlink prices: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch prices: {str(e)}")
+
+
+@app.get("/chainlink/price/{symbol}/history", response_model=ChainlinkHistoricalPricesResponse, tags=["Chainlink MCP"])
+async def get_chainlink_historical_prices(
+    symbol: str = Path(..., description="Price pair symbol"),
+    chain: str = Query("ethereum", description="Blockchain network"),
+    days: int = Query(30, description="Number of days of historical data")
+):
+    """
+    Get historical price data from Chainlink price feeds
+    
+    - **symbol**: Price pair symbol (ETH/USD, BTC/USD, etc.)
+    - **chain**: Blockchain network
+    - **days**: Number of days of historical data (1-365)
+    """
+    try:
+        if days < 1 or days > 365:
+            raise HTTPException(
+                status_code=400,
+                detail="Days must be between 1 and 365"
+            )
+            
+        async with chainlink_mcp_service as service:
+            historical_data = await service.get_historical_prices(symbol, chain, days)
+            
+            return ChainlinkHistoricalPricesResponse(
+                symbol=symbol,
+                chain=chain,
+                period_days=days,
+                data=historical_data
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching historical prices for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch historical data: {str(e)}")
+
+
+@app.get("/chainlink/price/{symbol}/volatility", response_model=ChainlinkVolatilityResponse, tags=["Chainlink MCP"])
+async def get_chainlink_price_volatility(
+    symbol: str = Path(..., description="Price pair symbol"),
+    chain: str = Query("ethereum", description="Blockchain network"),
+    period: int = Query(24, description="Analysis period in hours")
+):
+    """
+    Get price volatility analysis using Chainlink data
+    
+    - **symbol**: Price pair symbol (ETH/USD, BTC/USD, etc.)
+    - **chain**: Blockchain network
+    - **period**: Analysis period in hours (1-168)
+    """
+    try:
+        if period < 1 or period > 168:  # 1 week max
+            raise HTTPException(
+                status_code=400,
+                detail="Period must be between 1 and 168 hours"
+            )
+            
+        async with chainlink_mcp_service as service:
+            volatility_data = await service.get_price_volatility(symbol, chain, period)
+            
+            if not volatility_data:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Insufficient data for volatility analysis of {symbol}"
+                )
+                
+            return ChainlinkVolatilityResponse(**volatility_data)
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error calculating volatility for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to calculate volatility: {str(e)}")
+
+
+@app.get("/chainlink/price/{symbol}/cross-chain", response_model=ChainlinkCrossChainPricesResponse, tags=["Chainlink MCP"])
+async def get_chainlink_cross_chain_prices(
+    symbol: str = Path(..., description="Price pair symbol")
+):
+    """
+    Get price feeds for a symbol across all supported chains
+    
+    - **symbol**: Price pair symbol (ETH/USD, BTC/USD, etc.)
+    
+    Returns price data from all chains where the feed is available
+    """
+    try:
+        async with chainlink_mcp_service as service:
+            cross_chain_data = await service.get_cross_chain_prices(symbol)
+            
+            if not cross_chain_data:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Price feed {symbol} not available on any supported chain"
+                )
+                
+            # Calculate price variance across chains
+            prices = [data["price"] for data in cross_chain_data.values()]
+            if len(prices) > 1:
+                import statistics
+                price_variance = statistics.variance(prices)
+            else:
+                price_variance = 0.0
+                
+            return ChainlinkCrossChainPricesResponse(
+                symbol=symbol,
+                chains=cross_chain_data,
+                price_variance=price_variance
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching cross-chain prices for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch cross-chain data: {str(e)}")
+
+
+@app.get("/chainlink/feeds", response_model=ChainlinkSupportedFeedsResponse, tags=["Chainlink MCP"])
+async def get_chainlink_supported_feeds():
+    """
+    Get all supported Chainlink price feed symbols and chains
+    """
+    try:
+        async with chainlink_mcp_service as service:
+            supported_feeds = await service.get_supported_feeds()
+            
+            # Get unique chains
+            all_chains = set()
+            for chains in supported_feeds.values():
+                all_chains.update(chains)
+                
+            return ChainlinkSupportedFeedsResponse(
+                feeds=supported_feeds,
+                total_feeds=len(supported_feeds),
+                chains=list(all_chains)
+            )
+            
+    except Exception as e:
+        logger.error(f"Error fetching supported feeds: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch supported feeds")
+
+
+@app.get("/chainlink/feed/{symbol}/health", response_model=ChainlinkFeedHealthResponse, tags=["Chainlink MCP"])
+async def get_chainlink_feed_health(
+    symbol: str = Path(..., description="Price pair symbol"),
+    chain: str = Query("ethereum", description="Blockchain network")
+):
+    """
+    Check the health status of a specific Chainlink price feed
+    
+    - **symbol**: Price pair symbol (ETH/USD, BTC/USD, etc.)
+    - **chain**: Blockchain network
+    
+    Returns feed health metrics including freshness and status
+    """
+    try:
+        async with chainlink_mcp_service as service:
+            health_data = await service.get_feed_health(symbol, chain)
+            
+            if not health_data:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Price feed {symbol} not found on {chain}"
+                )
+                
+            return ChainlinkFeedHealthResponse(**health_data)
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error checking feed health for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to check feed health: {str(e)}")
+
+
+@app.get("/chainlink/network/status", response_model=ChainlinkNetworkStatusResponse, tags=["Chainlink MCP"])
+async def get_chainlink_network_status():
+    """
+    Get overall Chainlink oracle network status
+    """
+    try:
+        async with chainlink_mcp_service as service:
+            network_status = await service.get_oracle_network_status()
+            
+            return ChainlinkNetworkStatusResponse(**network_status)
+            
+    except Exception as e:
+        logger.error(f"Error fetching network status: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch network status")
 
 
 # Development and testing endpoints

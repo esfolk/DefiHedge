@@ -4,6 +4,7 @@ import { WalletConnect } from '@/components/WalletConnect';
 import { PortfolioDashboard } from '@/components/PortfolioDashboard';
 import { RiskAnalysisDashboard } from '@/components/RiskAnalysisDashboard';
 import { DemoPortfolioSelector } from '@/components/DemoPortfolioSelector';
+import { ChainlinkDashboard } from '@/components/ChainlinkDashboard';
 import { WalletConnection } from '@/../types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCompleteRiskAnalysis } from '@/hooks/use-api';
@@ -93,12 +94,15 @@ export default function Home() {
             {/* Dashboard Tabs */}
             {walletConnection && (
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsList className="grid w-full grid-cols-3 mb-6">
                   <TabsTrigger value="portfolio" className="flex items-center gap-2">
                     📊 Portfolio Overview
                   </TabsTrigger>
                   <TabsTrigger value="risk" className="flex items-center gap-2">
                     🎯 Risk Analysis
+                  </TabsTrigger>
+                  <TabsTrigger value="chainlink" className="flex items-center gap-2">
+                    🔗 Oracle Data
                   </TabsTrigger>
                 </TabsList>
                 
@@ -113,6 +117,10 @@ export default function Home() {
                     isLoading={riskAnalysis.loading}
                     initialData={riskAnalysis.data}
                   />
+                </TabsContent>
+                
+                <TabsContent value="chainlink">
+                  <ChainlinkDashboard autoRefresh={true} />
                 </TabsContent>
               </Tabs>
             )}

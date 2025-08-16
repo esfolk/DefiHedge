@@ -133,6 +133,139 @@ class SuccessResponse(BaseModel):
         }
 
 
+# Chainlink MCP API Models
+
+class ChainlinkPriceFeedResponse(BaseModel):
+    """Chainlink price feed response"""
+    symbol: str = Field(..., description="Price pair symbol (e.g., ETH/USD)")
+    price: float = Field(..., description="Current price")
+    decimals: int = Field(..., description="Price feed decimals")
+    updated_at: datetime = Field(..., description="Last update timestamp")
+    round_id: str = Field(..., description="Price feed round ID")
+    chain: str = Field(..., description="Blockchain network")
+    feed_address: str = Field(..., description="Price feed contract address")
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
+class ChainlinkMultiplePricesResponse(BaseModel):
+    """Multiple Chainlink price feeds response"""
+    prices: Dict[str, ChainlinkPriceFeedResponse] = Field(..., description="Price feed data by symbol")
+    chain: str = Field(..., description="Blockchain network")
+    fetched_at: datetime = Field(default_factory=datetime.utcnow, description="Data fetch timestamp")
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
+class ChainlinkHistoricalPrice(BaseModel):
+    """Historical price data point"""
+    timestamp: datetime = Field(..., description="Price timestamp")
+    price: float = Field(..., description="Price value")
+    round_id: str = Field(..., description="Round ID")
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
+class ChainlinkHistoricalPricesResponse(BaseModel):
+    """Historical price data response"""
+    symbol: str = Field(..., description="Price pair symbol")
+    chain: str = Field(..., description="Blockchain network")
+    period_days: int = Field(..., description="Historical data period in days")
+    data: List[ChainlinkHistoricalPrice] = Field(..., description="Historical price data")
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
+class ChainlinkVolatilityResponse(BaseModel):
+    """Price volatility analysis response"""
+    symbol: str = Field(..., description="Price pair symbol")
+    chain: str = Field(..., description="Blockchain network")
+    period_hours: int = Field(..., description="Analysis period in hours")
+    volatility_percent: float = Field(..., description="Volatility percentage")
+    mean_price: float = Field(..., description="Mean price over period")
+    min_price: float = Field(..., description="Minimum price")
+    max_price: float = Field(..., description="Maximum price")
+    price_range_percent: float = Field(..., description="Price range percentage")
+    data_points: int = Field(..., description="Number of data points analyzed")
+
+
+class ChainlinkCrossChainPricesResponse(BaseModel):
+    """Cross-chain price comparison response"""
+    symbol: str = Field(..., description="Price pair symbol")
+    chains: Dict[str, ChainlinkPriceFeedResponse] = Field(..., description="Price data by chain")
+    price_variance: float = Field(..., description="Price variance across chains")
+    fetched_at: datetime = Field(default_factory=datetime.utcnow, description="Data fetch timestamp")
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
+class ChainlinkSupportedFeedsResponse(BaseModel):
+    """Supported price feeds response"""
+    feeds: Dict[str, List[str]] = Field(..., description="Supported symbols and their chains")
+    total_feeds: int = Field(..., description="Total number of supported feeds")
+    chains: List[str] = Field(..., description="Supported blockchain networks")
+
+
+class ChainlinkFeedHealthResponse(BaseModel):
+    """Price feed health status response"""
+    symbol: str = Field(..., description="Price pair symbol")
+    chain: str = Field(..., description="Blockchain network")
+    is_healthy: bool = Field(..., description="Whether feed is healthy")
+    last_updated: datetime = Field(..., description="Last update timestamp")
+    minutes_since_update: int = Field(..., description="Minutes since last update")
+    current_price: float = Field(..., description="Current price")
+    round_id: str = Field(..., description="Current round ID")
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
+class ChainlinkNetworkStatusResponse(BaseModel):
+    """Oracle network status response"""
+    status: str = Field(..., description="Overall network status")
+    active_nodes: Optional[int] = Field(None, description="Number of active oracle nodes")
+    total_feeds: Optional[int] = Field(None, description="Total number of price feeds")
+    network_health: Optional[str] = Field(None, description="Network health indicator")
+    last_update: Optional[datetime] = Field(None, description="Last network status update")
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
+class ChainlinkHealthCheckResponse(BaseModel):
+    """Chainlink MCP service health response"""
+    status: str = Field(..., description="Service status")
+    mcp_server_url: str = Field(..., description="MCP server URL")
+    connection: str = Field(..., description="Connection status")
+    sample_feed_working: bool = Field(..., description="Whether sample feed is working")
+    supported_symbols: int = Field(..., description="Number of supported symbols")
+    timestamp: datetime = Field(..., description="Health check timestamp")
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
 # Future API models for advanced features
 
 # Risk Analysis Models

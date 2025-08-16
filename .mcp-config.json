@@ -1,0 +1,17 @@
+{
+  "servers": {
+    "chainlink": {
+      "command": "npx",
+      "args": ["-y", "@chainlink/mcp-server"],
+      "env": {
+        "MCP_AI_SERVICE": "openai",
+        "OPENAI_API_KEY": "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",
+        "CHAINLINK_NODE_URL": "https://cl-ea.linkpool.io/",
+        "ETHEREUM_RPC_URL": "https://mainnet.infura.io/v3/YOUR_PROJECT_ID",
+        "POLYGON_RPC_URL": "https://polygon-mainnet.infura.io/v3/YOUR_PROJECT_ID",
+        "ARBITRUM_RPC_URL": "https://arbitrum-mainnet.infura.io/v3/YOUR_PROJECT_ID",
+        "BASE_RPC_URL": "https://mainnet.base.org"
+      }
+    }
+  }
+}

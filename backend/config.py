@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     graph_api_key: Optional[str] = Field(None, env="GRAPH_API_KEY")
     mcp_server_url: Optional[str] = Field(None, env="MCP_SERVER_URL")
     
+    # Chainlink MCP Configuration
+    chainlink_mcp_server_url: str = Field("http://localhost:3002", env="CHAINLINK_MCP_SERVER_URL")
+    chainlink_node_url: str = Field("https://cl-ea.linkpool.io/", env="CHAINLINK_NODE_URL")
+    openai_api_key: Optional[str] = Field(None, env="OPENAI_API_KEY")
+    
     # Database & Cache
     database_url: str = Field("postgresql://defiguard:password@postgres:5432/defiguard_db", env="DATABASE_URL")
     redis_url: str = Field("redis://redis:6379", env="REDIS_URL")
