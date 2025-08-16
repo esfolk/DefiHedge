@@ -26,25 +26,9 @@ from models.api_models import (
     HealthResponse, ErrorResponse, SuccessResponse, ChainId,
     TokenBalanceResponse, ChainBalanceResponse
 )
+from config import settings
 
-# Configuration
-class Settings:
-    APP_NAME = "DeFiGuard Risk API"
-    APP_VERSION = "1.0.0"
-    APP_DESCRIPTION = "AI-Powered Multi-Chain DeFi Portfolio Management"
-    
-    # Environment variables
-    CDP_API_KEY_ID = os.getenv("CDP_API_KEY_ID")
-    CDP_API_SECRET = os.getenv("CDP_API_KEY_SECRET")
-    REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
-    CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
-    DEBUG = os.getenv("DEBUG", "true").lower() == "true"
-    
-    # API Configuration
-    MAX_PORTFOLIO_SIZE = int(os.getenv("MAX_PORTFOLIO_SIZE", "100"))
-    API_RATE_LIMIT = int(os.getenv("API_RATE_LIMIT", "100"))
-
-settings = Settings()
+# Using settings from config.py
 
 # Global service instances
 coinbase_service: Optional[DeFiGuardCoinbaseService] = None
@@ -59,14 +43,14 @@ async def lifespan(app: FastAPI):
     
     try:
         # Initialize services
-        if not settings.CDP_API_KEY_ID or not settings.CDP_API_SECRET:
+        if not settings.cdp_api_key_id or not settings.cdp_api_secret:
             logger.error("❌ CDP API credentials not configured")
             raise ValueError("CDP API credentials required")
         
         coinbase_service = create_coinbase_service(
-            settings.CDP_API_KEY_ID,
-            settings.CDP_API_SECRET,
-            settings.REDIS_URL
+            settings.cdp_api_key_id,
+            settings.cdp_api_secret,
+            settings.redis_url
         )
         
         await coinbase_service.initialize()
@@ -86,18 +70,18 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(
-    title=settings.APP_NAME,
-    version=settings.APP_VERSION,
-    description=settings.APP_DESCRIPTION,
-    docs_url="/docs" if settings.DEBUG else None,
-    redoc_url="/redoc" if settings.DEBUG else None,
+    title=settings.app_name,
+    version=settings.app_version,
+    description=settings.app_description,
+    docs_url="/docs" if settings.debug else None,
+    redoc_url="/redoc" if settings.debug else None,
     lifespan=lifespan
 )
 
 # Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings.get_cors_origins(),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
@@ -135,7 +119,7 @@ async def general_exception_handler(request, exc):
         status_code=500,
         content=ErrorResponse(
             error="Internal server error",
-            detail=str(exc) if settings.DEBUG else "An unexpected error occurred"
+            detail=str(exc) if settings.debug else "An unexpected error occurred"
         ).dict()
     )
 
@@ -161,12 +145,12 @@ async def root():
     API root endpoint with basic information
     """
     return SuccessResponse(
-        message=f"Welcome to {settings.APP_NAME} v{settings.APP_VERSION}",
+        message=f"Welcome to {settings.app_name} v{settings.app_version}",
         data={
-            "service": settings.APP_NAME,
-            "version": settings.APP_VERSION,
-            "description": settings.APP_DESCRIPTION,
-            "docs": "/docs" if settings.DEBUG else "Not available in production",
+            "service": settings.app_name,
+            "version": settings.app_version,
+            "description": settings.app_description,
+            "docs": "/docs" if settings.debug else "Not available in production",
             "supported_chains": [chain.name.title() for chain in ChainId],
             "features": [
                 "Multi-chain portfolio aggregation",
@@ -398,7 +382,7 @@ async def get_supported_chains(
         raise HTTPException(status_code=500, detail="Failed to fetch chain information")
 
 # Development and testing endpoints
-if settings.DEBUG:
+if settings.debug:
     @app.get("/debug/test", response_model=SuccessResponse, tags=["Debug"])
     async def debug_test():
         """
@@ -419,7 +403,7 @@ if __name__ == "__main__":
     logger.remove()
     logger.add(
         sys.stderr,
-        level="DEBUG" if settings.DEBUG else "INFO",
+        level="DEBUG" if settings.debug else "INFO",
         format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
     )
     
@@ -430,7 +414,7 @@ if __name__ == "__main__":
         "main:app",
         host="0.0.0.0",
         port=8000,
-        reload=settings.DEBUG,
-        workers=1 if settings.DEBUG else 4,
-        log_level="debug" if settings.DEBUG else "info"
+        reload=settings.debug,
+        workers=1 if settings.debug else 4,
+        log_level="debug" if settings.debug else "info"
     )

@@ -4,7 +4,8 @@ Configuration management for DeFiGuard Risk Backend
 
 import os
 from typing import List, Optional
-from pydantic import BaseSettings, Field
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -34,7 +35,7 @@ class Settings(BaseSettings):
     # Security
     jwt_secret: str = Field("dev-jwt-secret-change-in-production", env="JWT_SECRET")
     api_secret_key: str = Field("dev-api-secret-change-in-production", env="API_SECRET_KEY")
-    cors_origins: List[str] = Field(["http://localhost:3000", "http://localhost:3001"], env="CORS_ORIGINS")
+    cors_origins: str = Field("http://localhost:3000,http://localhost:3001", env="CORS_ORIGINS")
     
     # API Configuration
     api_rate_limit: int = Field(100, env="API_RATE_LIMIT")
@@ -53,10 +54,12 @@ class Settings(BaseSettings):
     enable_metrics: bool = Field(True, env="ENABLE_METRICS")
     enable_debug_logs: bool = Field(True, env="ENABLE_DEBUG_LOGS")
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": False,
+        "extra": "ignore"
+    }
         
     @property
     def is_production(self) -> bool:
@@ -70,9 +73,7 @@ class Settings(BaseSettings):
     
     def get_cors_origins(self) -> List[str]:
         """Get CORS origins as a list"""
-        if isinstance(self.cors_origins, str):
-            return [origin.strip() for origin in self.cors_origins.split(",")]
-        return self.cors_origins
+        return [origin.strip() for origin in self.cors_origins.split(",")]
 
 
 # Global settings instance

@@ -241,13 +241,118 @@ export interface ChainConfig {
   iconUrl?: string;
 }
 
-// Wallet Connection Types
+// Enhanced Wallet Connection Types with Provider Support
 export interface WalletConnection {
   address: string;
   chainId: number;
   isConnected: boolean;
   connector?: string;
+  provider?: any;
 }
+
+// DeFi Dashboard Types (from frontend-temp integration)
+export interface Chain {
+  id: string;
+  name: string;
+  symbol: string;
+  logo: string;
+  rpcUrl: string;
+  blockExplorer: string;
+  isTestnet?: boolean;
+}
+
+export interface Token {
+  address: string;
+  symbol: string;
+  name: string;
+  decimals: number;
+  logo?: string;
+  balance: string;
+  balanceUSD: number;
+  price: number;
+  priceChange24h?: number;
+  chain: string;
+}
+
+export interface PortfolioData {
+  address: string;
+  totalValueUSD: number;
+  chains: {
+    [chainId: string]: {
+      name: string;
+      totalValueUSD: number;
+      tokens: Token[];
+    };
+  };
+  lastUpdated: string;
+}
+
+export interface PriceData {
+  symbol: string;
+  price: number;
+  change24h: number;
+  change7d: number;
+  marketCap: number;
+  volume24h: number;
+  lastUpdated: string;
+}
+
+export interface PortfolioSummary {
+  totalValue: number;
+  totalTokens: number;
+  chainsCount: number;
+  topHoldings: Token[];
+  chainDistribution: {
+    chainId: string;
+    name: string;
+    value: number;
+    percentage: number;
+  }[];
+}
+
+// Supported Chains Configuration
+export const SUPPORTED_CHAINS: Chain[] = [
+  {
+    id: '1',
+    name: 'Ethereum',
+    symbol: 'ETH',
+    logo: '🔷',
+    rpcUrl: 'https://eth.llamarpc.com',
+    blockExplorer: 'https://etherscan.io'
+  },
+  {
+    id: '137',
+    name: 'Polygon',
+    symbol: 'MATIC',
+    logo: '🔮',
+    rpcUrl: 'https://polygon.llamarpc.com',
+    blockExplorer: 'https://polygonscan.com'
+  },
+  {
+    id: '42161',
+    name: 'Arbitrum',
+    symbol: 'ARB',
+    logo: '🔵',
+    rpcUrl: 'https://arb1.arbitrum.io/rpc',
+    blockExplorer: 'https://arbiscan.io'
+  },
+  {
+    id: '10',
+    name: 'Optimism',
+    symbol: 'OP',
+    logo: '🔴',
+    rpcUrl: 'https://mainnet.optimism.io',
+    blockExplorer: 'https://optimistic.etherscan.io'
+  },
+  {
+    id: '8453',
+    name: 'Base',
+    symbol: 'BASE',
+    logo: '🔶',
+    rpcUrl: 'https://mainnet.base.org',
+    blockExplorer: 'https://basescan.org'
+  }
+];
 
 // Error Types
 export interface DeFiGuardError {

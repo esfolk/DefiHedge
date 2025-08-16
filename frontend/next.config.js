@@ -1,16 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    appDir: true,
-  },
   output: 'standalone',
   reactStrictMode: true,
   swcMinify: true,
   
   // Environment variables
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-    NEXT_PUBLIC_CHAIN_IDS: process.env.NEXT_PUBLIC_CHAIN_IDS,
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+    NEXT_PUBLIC_CHAIN_IDS: process.env.NEXT_PUBLIC_CHAIN_IDS || '1,137,42161,10,8453',
   },
 
   // Image optimization
@@ -69,13 +66,7 @@ const nextConfig = {
 
   // Redirects
   async redirects() {
-    return [
-      {
-        source: '/',
-        destination: '/dashboard',
-        permanent: false,
-      },
-    ];
+    return [];
   },
 
   // TypeScript configuration
