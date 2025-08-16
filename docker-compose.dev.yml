@@ -31,7 +31,8 @@ services:
       - ENVIRONMENT=development
       - DATABASE_URL=postgresql://defiguard:password@postgres:5432/defiguard_db
       - REDIS_URL=redis://redis:6379
-      - CDP_API_KEY=${CDP_API_KEY:-test_key}
+      - CDP_API_KEY_ID=${CDP_API_KEY_ID:-8f652a5e-320b-47f1-97eb-07b8846c9fd7}
+      - CDP_API_KEY_SECRET=${CDP_API_SECRET:-P86+MD85j7S8zlSOU5JXVkiyczcrncDPQTrbktpfAwGlf2/SoZd6X7I54CjwEA0JTYOFyWSravG2J1T642rY5w==}
       - GRAPH_API_KEY=${GRAPH_API_KEY:-test_key}
       - MCP_SERVER_URL=${MCP_SERVER_URL:-http://localhost:3001}
       - PYTHONPATH=/app
