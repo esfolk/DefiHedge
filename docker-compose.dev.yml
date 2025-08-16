@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_CHAIN_IDS=1,137,42161,10,8453
+      - WATCHPACK_POLLING=true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    networks:
+      - defiguard-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql://defiguard:password@postgres:5432/defiguard_db
+      - REDIS_URL=redis://redis:6379
+      - CDP_API_KEY=${CDP_API_KEY:-test_key}
+      - GRAPH_API_KEY=${GRAPH_API_KEY:-test_key}
+      - MCP_SERVER_URL=${MCP_SERVER_URL:-http://localhost:3001}
+      - PYTHONPATH=/app
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - defiguard-network
+
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=defiguard_db
+      - POSTGRES_USER=defiguard
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ./backend/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - defiguard-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_dev:/data
+    command: redis-server --appendonly yes
+    networks:
+      - defiguard-network
+
+  # Optional: Redis Commander for debugging
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - defiguard-network
+
+  # Optional: pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@defiguard.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "8082:80"
+    depends_on:
+      - postgres
+    networks:
+      - defiguard-network
+
+volumes:
+  postgres_data_dev:
+  redis_data_dev:
+
+networks:
+  defiguard-network:
+    driver: bridge

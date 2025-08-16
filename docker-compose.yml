@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_CHAIN_IDS=1,137,42161,10,8453
+    depends_on:
+      - backend
+    networks:
+      - defiguard-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://defiguard:password@postgres:5432/defiguard_db
+      - REDIS_URL=redis://redis:6379
+      - CDP_API_KEY=${CDP_API_KEY}
+      - GRAPH_API_KEY=${GRAPH_API_KEY}
+      - MCP_SERVER_URL=${MCP_SERVER_URL}
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - defiguard-network
+
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=defiguard_db
+      - POSTGRES_USER=defiguard
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - defiguard-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - defiguard-network
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - defiguard-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  defiguard-network:
+    driver: bridge
