@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
 import { PortfolioData, PriceData, Chain } from '@/../types';
+import { apiCache, cacheKeys, performanceMonitor } from '@/utils/performance';
 
 // API Response interfaces matching backend models
 export interface APIHealthResponse {
@@ -274,16 +275,39 @@ class APIClient {
     }
   }
 
-  // Risk Analysis endpoints
+  // Risk Analysis endpoints with caching
   async getCompleteRiskAnalysis(address: string, lookbackDays: number = 365): Promise<CompleteRiskAnalysisResponse> {
-    const params = new URLSearchParams();
-    if (lookbackDays !== 365) {
-      params.append('lookback_days', lookbackDays.toString());
+    const cacheKey = cacheKeys.riskAnalysis(address, lookbackDays);
+    
+    // Check cache first
+    const cachedData = apiCache.get(cacheKey);
+    if (cachedData) {
+      console.log('🔄 Using cached risk analysis data for', address);
+      return cachedData;
     }
     
-    const url = `/portfolio/${address}/risk-analysis${params.toString() ? `?${params.toString()}` : ''}`;
-    const response = await this.client.post<CompleteRiskAnalysisResponse>(url);
-    return response.data;
+    const endTimer = performanceMonitor.startTimer('risk_analysis_complete');
+    
+    try {
+      const params = new URLSearchParams();
+      if (lookbackDays !== 365) {
+        params.append('lookback_days', lookbackDays.toString());
+      }
+      
+      const url = `/portfolio/${address}/risk-analysis${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await this.client.post<CompleteRiskAnalysisResponse>(url);
+      
+      // Cache the response for 10 minutes (risk analysis is expensive)
+      apiCache.set(cacheKey, response.data, 10);
+      
+      const duration = endTimer();
+      console.log(`⚡ Risk analysis completed in ${duration.toFixed(0)}ms`);
+      
+      return response.data;
+    } catch (error) {
+      endTimer();
+      throw error;
+    }
   }
 
   async getRiskContribution(address: string, lookbackDays: number = 365): Promise<RiskContributionResponse> {

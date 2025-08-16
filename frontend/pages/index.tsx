@@ -3,17 +3,34 @@ import Head from 'next/head';
 import { WalletConnect } from '@/components/WalletConnect';
 import { PortfolioDashboard } from '@/components/PortfolioDashboard';
 import { RiskAnalysisDashboard } from '@/components/RiskAnalysisDashboard';
+import { DemoPortfolioSelector } from '@/components/DemoPortfolioSelector';
 import { WalletConnection } from '@/../types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCompleteRiskAnalysis } from '@/hooks/use-api';
 import { CompleteRiskAnalysisResponse } from '@/services/api';
+import { DEMO_PORTFOLIOS } from '@/config/demo';
 
 export default function Home() {
   const [walletConnection, setWalletConnection] = useState<WalletConnection | null>(null);
   const [activeTab, setActiveTab] = useState('portfolio');
+  const [showDemoSelector, setShowDemoSelector] = useState(!walletConnection);
   
   // Risk analysis hook for the current wallet
   const riskAnalysis = useCompleteRiskAnalysis(walletConnection?.address || null);
+  
+  // Handle demo portfolio selection
+  const handleDemoPortfolioSelect = (address: string) => {
+    const portfolio = DEMO_PORTFOLIOS.find(p => p.address === address);
+    if (portfolio) {
+      setWalletConnection({
+        address: address,
+        provider: 'demo',
+        chainId: '1'
+      });
+      setShowDemoSelector(false);
+      setActiveTab('portfolio'); // Start with portfolio overview
+    }
+  };
   
   // Function to run live risk analysis
   const handleRiskAnalysis = async (address: string): Promise<CompleteRiskAnalysisResponse | null> => {
@@ -26,6 +43,12 @@ export default function Home() {
       console.error('❌ Risk analysis failed:', error);
       throw error;
     }
+  };
+  
+  // Handle wallet connection changes
+  const handleWalletConnectionChange = (connection: WalletConnection | null) => {
+    setWalletConnection(connection);
+    setShowDemoSelector(!connection);
   };
 
   return (
@@ -54,8 +77,18 @@ export default function Home() {
 
           {/* Main Content */}
           <div className="space-y-8">
-            {/* Wallet Connection */}
-            <WalletConnect onConnectionChange={setWalletConnection} />
+            {/* Demo Portfolio Selector - Show when no wallet connected */}
+            {showDemoSelector && (
+              <DemoPortfolioSelector 
+                onSelectPortfolio={handleDemoPortfolioSelect}
+                selectedAddress={walletConnection?.address}
+              />
+            )}
+            
+            {/* Wallet Connection - Show when no demo selected */}
+            {!showDemoSelector && (
+              <WalletConnect onConnectionChange={handleWalletConnectionChange} />
+            )}
 
             {/* Dashboard Tabs */}
             {walletConnection && (
