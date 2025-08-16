@@ -20,6 +20,7 @@ import uvicorn
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from services.coinbase_service import DeFiGuardCoinbaseService, create_coinbase_service
+from services.graph_service import DeFiGuardGraphService, create_graph_service
 from models.api_models import (
     PortfolioResponse, PortfolioRequest, PriceResponse, PriceRequest,
     HealthResponse, ErrorResponse, SuccessResponse, ChainId,
