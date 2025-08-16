@@ -2,10 +2,13 @@ import { useState } from 'react';
 import Head from 'next/head';
 import { WalletConnect } from '@/components/WalletConnect';
 import { PortfolioDashboard } from '@/components/PortfolioDashboard';
+import { RiskAnalysisDashboard } from '@/components/RiskAnalysisDashboard';
 import { WalletConnection } from '@/../types';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function Home() {
   const [walletConnection, setWalletConnection] = useState<WalletConnection | null>(null);
+  const [activeTab, setActiveTab] = useState('portfolio');
 
   return (
     <>
@@ -36,18 +39,43 @@ export default function Home() {
             {/* Wallet Connection */}
             <WalletConnect onConnectionChange={setWalletConnection} />
 
-            {/* Portfolio Dashboard */}
+            {/* Dashboard Tabs */}
             {walletConnection && (
-              <PortfolioDashboard connection={walletConnection} />
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-6">
+                  <TabsTrigger value="portfolio" className="flex items-center gap-2">
+                    📊 Portfolio Overview
+                  </TabsTrigger>
+                  <TabsTrigger value="risk" className="flex items-center gap-2">
+                    🎯 Risk Analysis
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="portfolio">
+                  <PortfolioDashboard connection={walletConnection} />
+                </TabsContent>
+                
+                <TabsContent value="risk">
+                  <RiskAnalysisDashboard 
+                    walletAddress={walletConnection.address}
+                    onAnalyze={async (address) => {
+                      // This will use the mock data for now
+                      // In production, this would call the real API
+                      console.log('Analyzing portfolio for:', address);
+                      return null; // Let component use mock data
+                    }}
+                  />
+                </TabsContent>
+              </Tabs>
             )}
 
             {/* Footer */}
             <footer className="text-center text-muted-foreground text-sm py-8 border-t border-border">
               <div className="space-y-2">
                 <p>&copy; 2025 DeFiGuard Risk. All rights reserved.</p>
-                <p>
-                  Powered by Coinbase Data API • Multi-Chain Analytics • AI Risk Assessment
-                </p>
+              <p>
+                Powered by Coinbase CDP • Riskfolio-Lib • PyPortfolioOpt • Multi-Chain Analytics
+              </p>
               </div>
             </footer>
           </div>

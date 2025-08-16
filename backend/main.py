@@ -21,10 +21,15 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from services.coinbase_service import DeFiGuardCoinbaseService, create_coinbase_service
 from services.graph_service import DeFiGuardGraphService, create_graph_service
+from services.risk_analysis_service import get_risk_analysis_service, RiskAnalysisService
 from models.api_models import (
     PortfolioResponse, PortfolioRequest, PriceResponse, PriceRequest,
     HealthResponse, ErrorResponse, SuccessResponse, ChainId,
-    TokenBalanceResponse, ChainBalanceResponse
+    TokenBalanceResponse, ChainBalanceResponse,
+    # Risk Analysis Models
+    RiskAnalysisRequest, CompleteRiskAnalysisResponse,
+    RiskContributionResponse, CorrelationResponse, 
+    EfficientFrontierResponse, PortfolioMetricsResponse
 )
 from config import settings
 
@@ -380,6 +385,235 @@ async def get_supported_chains(
     except Exception as e:
         logger.error(f"Error fetching supported chains: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch chain information")
+
+# Risk Analysis endpoints
+@app.post("/portfolio/{address}/risk-analysis", response_model=CompleteRiskAnalysisResponse, tags=["Risk Analysis"])
+async def analyze_portfolio_risk(
+    address: str = Path(..., description="Wallet address", min_length=42, max_length=42),
+    request: RiskAnalysisRequest = None,
+    lookback_days: Optional[int] = Query(365, description="Historical data lookback period in days"),
+    coinbase_service: DeFiGuardCoinbaseService = Depends(get_coinbase_service),
+    risk_service: RiskAnalysisService = Depends(get_risk_analysis_service)
+):
+    """
+    Perform comprehensive risk analysis on a portfolio
+    
+    This endpoint provides sophisticated portfolio risk analysis including:
+    - Risk contribution analysis (which assets contribute most to portfolio risk)
+    - Asset correlation heatmap (diversification analysis)
+    - Efficient frontier analysis (optimal portfolio positioning)
+    - Comprehensive portfolio metrics (Sharpe ratio, VaR, drawdown, etc.)
+    
+    - **address**: Ethereum-compatible wallet address (0x...)
+    - **lookback_days**: Historical data period for analysis (30-1095 days)
+    """
+    try:
+        # Validate address format
+        if not address.startswith('0x') or len(address) != 42:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid address format. Must be 42-character hex string starting with 0x"
+            )
+        
+        logger.info(f"🔍 Starting risk analysis for portfolio: {address}")
+        
+        # Get portfolio data from Coinbase service
+        chain_balances = await coinbase_service.get_portfolio_balances(address, None)
+        
+        if not chain_balances:
+            raise HTTPException(
+                status_code=404,
+                detail="No portfolio data found for this address"
+            )
+        
+        # Convert portfolio data to risk analysis format
+        portfolio_data = {}
+        for chain_balance in chain_balances:
+            for token in chain_balance.tokens:
+                # Use symbol as key, aggregate values if same token on multiple chains
+                if token.symbol in portfolio_data:
+                    portfolio_data[token.symbol] += token.value_usd
+                else:
+                    portfolio_data[token.symbol] = token.value_usd
+        
+        # Filter out assets with very small values (less than $10)
+        portfolio_data = {k: v for k, v in portfolio_data.items() if v >= 10.0}
+        
+        if not portfolio_data:
+            raise HTTPException(
+                status_code=400,
+                detail="Portfolio contains no significant assets for risk analysis (minimum $10 per asset)"
+            )
+        
+        logger.info(f"📊 Analyzing portfolio with {len(portfolio_data)} assets, total value: ${sum(portfolio_data.values()):,.2f}")
+        
+        # Perform risk analysis
+        analysis_results = await risk_service.get_portfolio_risk_analysis(
+            portfolio_data=portfolio_data,
+            lookback_days=lookback_days or 365
+        )
+        
+        if "error" in analysis_results:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Risk analysis failed: {analysis_results['error']}"
+            )
+        
+        # Convert to response models
+        response = CompleteRiskAnalysisResponse(
+            risk_contribution=RiskContributionResponse(**analysis_results['risk_contribution']),
+            correlation=CorrelationResponse(**analysis_results['correlation']),
+            efficient_frontier=EfficientFrontierResponse(**analysis_results['efficient_frontier']),
+            portfolio_metrics=PortfolioMetricsResponse(**analysis_results['portfolio_metrics'])
+        )
+        
+        logger.info(f"✅ Risk analysis completed successfully for {address}")
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Risk analysis error for {address}: {e}")
+        raise HTTPException(status_code=500, detail=f"Risk analysis failed: {str(e)}")
+
+
+@app.post("/portfolio/{address}/risk-contribution", response_model=RiskContributionResponse, tags=["Risk Analysis"])
+async def get_risk_contribution(
+    address: str = Path(..., description="Wallet address", min_length=42, max_length=42),
+    lookback_days: Optional[int] = Query(365, description="Historical data lookback period in days"),
+    coinbase_service: DeFiGuardCoinbaseService = Depends(get_coinbase_service),
+    risk_service: RiskAnalysisService = Depends(get_risk_analysis_service)
+):
+    """
+    Get risk contribution analysis - shows what percentage of total portfolio risk each asset contributes
+    
+    This is different from portfolio weights - an asset might be 5% of portfolio value 
+    but contribute 30% of the risk!
+    """
+    try:
+        # Get portfolio data and perform analysis (similar to above)
+        chain_balances = await coinbase_service.get_portfolio_balances(address, None)
+        portfolio_data = {}
+        
+        for chain_balance in chain_balances:
+            for token in chain_balance.tokens:
+                if token.symbol in portfolio_data:
+                    portfolio_data[token.symbol] += token.value_usd
+                else:
+                    portfolio_data[token.symbol] = token.value_usd
+        
+        portfolio_data = {k: v for k, v in portfolio_data.items() if v >= 10.0}
+        
+        if not portfolio_data:
+            raise HTTPException(status_code=400, detail="No significant assets found for analysis")
+        
+        analysis_results = await risk_service.get_portfolio_risk_analysis(
+            portfolio_data=portfolio_data,
+            lookback_days=lookback_days or 365
+        )
+        
+        if "error" in analysis_results:
+            raise HTTPException(status_code=500, detail=analysis_results['error'])
+        
+        return RiskContributionResponse(**analysis_results['risk_contribution'])
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Risk contribution analysis failed: {str(e)}")
+
+
+@app.post("/portfolio/{address}/correlation", response_model=CorrelationResponse, tags=["Risk Analysis"])
+async def get_correlation_analysis(
+    address: str = Path(..., description="Wallet address", min_length=42, max_length=42),
+    lookback_days: Optional[int] = Query(365, description="Historical data lookback period in days"),
+    coinbase_service: DeFiGuardCoinbaseService = Depends(get_coinbase_service),
+    risk_service: RiskAnalysisService = Depends(get_risk_analysis_service)
+):
+    """
+    Get asset correlation analysis - shows how assets move relative to each other
+    
+    High correlation (red) = assets move together = poor diversification
+    Low correlation (blue/green) = assets move independently = good diversification
+    """
+    try:
+        # Similar portfolio data extraction
+        chain_balances = await coinbase_service.get_portfolio_balances(address, None)
+        portfolio_data = {}
+        
+        for chain_balance in chain_balances:
+            for token in chain_balance.tokens:
+                if token.symbol in portfolio_data:
+                    portfolio_data[token.symbol] += token.value_usd
+                else:
+                    portfolio_data[token.symbol] = token.value_usd
+        
+        portfolio_data = {k: v for k, v in portfolio_data.items() if v >= 10.0}
+        
+        if len(portfolio_data) < 2:
+            raise HTTPException(status_code=400, detail="Need at least 2 assets for correlation analysis")
+        
+        analysis_results = await risk_service.get_portfolio_risk_analysis(
+            portfolio_data=portfolio_data,
+            lookback_days=lookback_days or 365
+        )
+        
+        if "error" in analysis_results:
+            raise HTTPException(status_code=500, detail=analysis_results['error'])
+        
+        return CorrelationResponse(**analysis_results['correlation'])
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Correlation analysis failed: {str(e)}")
+
+
+@app.post("/portfolio/{address}/efficient-frontier", response_model=EfficientFrontierResponse, tags=["Risk Analysis"])
+async def get_efficient_frontier(
+    address: str = Path(..., description="Wallet address", min_length=42, max_length=42),
+    lookback_days: Optional[int] = Query(365, description="Historical data lookback period in days"),
+    coinbase_service: DeFiGuardCoinbaseService = Depends(get_coinbase_service),
+    risk_service: RiskAnalysisService = Depends(get_risk_analysis_service)
+):
+    """
+    Get efficient frontier analysis - shows optimal risk/return combinations
+    
+    The efficient frontier shows the best possible return for each level of risk.
+    Your current portfolio position is plotted against this optimal curve.
+    """
+    try:
+        # Portfolio data extraction
+        chain_balances = await coinbase_service.get_portfolio_balances(address, None)
+        portfolio_data = {}
+        
+        for chain_balance in chain_balances:
+            for token in chain_balance.tokens:
+                if token.symbol in portfolio_data:
+                    portfolio_data[token.symbol] += token.value_usd
+                else:
+                    portfolio_data[token.symbol] = token.value_usd
+        
+        portfolio_data = {k: v for k, v in portfolio_data.items() if v >= 10.0}
+        
+        if len(portfolio_data) < 2:
+            raise HTTPException(status_code=400, detail="Need at least 2 assets for efficient frontier analysis")
+        
+        analysis_results = await risk_service.get_portfolio_risk_analysis(
+            portfolio_data=portfolio_data,
+            lookback_days=lookback_days or 365
+        )
+        
+        if "error" in analysis_results:
+            raise HTTPException(status_code=500, detail=analysis_results['error'])
+        
+        return EfficientFrontierResponse(**analysis_results['efficient_frontier'])
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Efficient frontier analysis failed: {str(e)}")
+
 
 # Development and testing endpoints
 if settings.debug:

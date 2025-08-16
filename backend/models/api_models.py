@@ -135,15 +135,139 @@ class SuccessResponse(BaseModel):
 
 # Future API models for advanced features
 
-class RiskMetricsResponse(BaseModel):
-    """Risk analysis response (for future implementation)"""
-    portfolio_risk: float = Field(..., description="Overall portfolio risk score")
-    sortino_ratio: Optional[float] = Field(None, description="Sortino ratio")
-    conditional_var: Optional[float] = Field(None, description="Conditional Value at Risk")
-    max_drawdown: Optional[float] = Field(None, description="Maximum drawdown")
-    sharpe_ratio: Optional[float] = Field(None, description="Sharpe ratio")
-    volatility: Optional[float] = Field(None, description="Portfolio volatility")
-    calculated_at: datetime = Field(..., description="Risk calculation timestamp")
+# Risk Analysis Models
+
+class RiskContributionData(BaseModel):
+    """Risk contribution data for a single asset"""
+    asset: str = Field(..., description="Asset symbol")
+    risk_contribution: float = Field(..., description="Risk contribution percentage")
+    portfolio_weight: float = Field(..., description="Portfolio weight percentage")
+
+
+class RiskContributionResponse(BaseModel):
+    """Risk contribution analysis response"""
+    data: List[RiskContributionData] = Field(..., description="Risk contribution data for each asset")
+    total_portfolio_risk: float = Field(..., description="Total portfolio risk percentage")
+    analysis_date: datetime = Field(..., description="Analysis timestamp")
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
+class CorrelationData(BaseModel):
+    """Asset correlation data point"""
+    asset1: str = Field(..., description="First asset symbol")
+    asset2: str = Field(..., description="Second asset symbol")
+    correlation: float = Field(..., description="Correlation coefficient")
+
+
+class CorrelationSummary(BaseModel):
+    """Correlation analysis summary"""
+    average_correlation: float = Field(..., description="Average correlation between assets")
+    max_correlation: float = Field(..., description="Maximum correlation")
+    min_correlation: float = Field(..., description="Minimum correlation")
+    diversification_ratio: float = Field(..., description="Portfolio diversification ratio")
+
+
+class CorrelationResponse(BaseModel):
+    """Asset correlation analysis response"""
+    data: List[CorrelationData] = Field(..., description="Correlation matrix data")
+    assets: List[str] = Field(..., description="List of assets analyzed")
+    summary: CorrelationSummary = Field(..., description="Correlation summary statistics")
+    analysis_date: datetime = Field(..., description="Analysis timestamp")
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
+class FrontierPoint(BaseModel):
+    """Efficient frontier data point"""
+    return: float = Field(..., alias="return", description="Expected return percentage")
+    risk: float = Field(..., description="Risk (volatility) percentage")
+    sharpe_ratio: float = Field(..., description="Sharpe ratio")
+    
+    class Config:
+        allow_population_by_field_name = True
+
+
+class PortfolioPoint(BaseModel):
+    """Portfolio performance point"""
+    return: float = Field(..., alias="return", description="Portfolio return percentage")
+    risk: float = Field(..., description="Portfolio risk percentage")
+    sharpe_ratio: float = Field(..., description="Portfolio Sharpe ratio")
+    
+    class Config:
+        allow_population_by_field_name = True
+
+
+class OptimalPortfolios(BaseModel):
+    """Optimal portfolio configurations"""
+    max_sharpe: PortfolioPoint = Field(..., description="Maximum Sharpe ratio portfolio")
+    min_volatility: PortfolioPoint = Field(..., description="Minimum volatility portfolio")
+
+
+class EfficientFrontierResponse(BaseModel):
+    """Efficient frontier analysis response"""
+    frontier_points: List[FrontierPoint] = Field(..., description="Efficient frontier curve points")
+    current_portfolio: PortfolioPoint = Field(..., description="Current portfolio position")
+    optimal_portfolios: OptimalPortfolios = Field(..., description="Optimal portfolio suggestions")
+    analysis_date: datetime = Field(..., description="Analysis timestamp")
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
+class PortfolioMetricsResponse(BaseModel):
+    """Comprehensive portfolio metrics response"""
+    annual_return: float = Field(..., description="Annualized return percentage")
+    annual_volatility: float = Field(..., description="Annualized volatility percentage")
+    sharpe_ratio: float = Field(..., description="Sharpe ratio")
+    var_95: float = Field(..., description="Value at Risk (95% confidence) percentage")
+    max_drawdown: float = Field(..., description="Maximum drawdown percentage")
+    calmar_ratio: float = Field(..., description="Calmar ratio")
+    sortino_ratio: float = Field(..., description="Sortino ratio")
+    analysis_period_days: int = Field(..., description="Analysis period in days")
+    analysis_date: datetime = Field(..., description="Analysis timestamp")
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
+class RiskAnalysisRequest(BaseModel):
+    """Risk analysis request"""
+    portfolio_data: Dict[str, float] = Field(..., description="Portfolio data mapping symbols to USD values")
+    lookback_days: Optional[int] = Field(365, description="Historical data lookback period in days")
+    
+    @validator('portfolio_data')
+    def validate_portfolio_data(cls, v):
+        if not v:
+            raise ValueError('Portfolio data cannot be empty')
+        for symbol, value in v.items():
+            if value <= 0:
+                raise ValueError(f'Portfolio value for {symbol} must be positive')
+        return v
+    
+    @validator('lookback_days')
+    def validate_lookback_days(cls, v):
+        if v is not None and (v < 30 or v > 1095):
+            raise ValueError('Lookback days must be between 30 and 1095')
+        return v
+
+
+class CompleteRiskAnalysisResponse(BaseModel):
+    """Complete risk analysis response containing all analyses"""
+    risk_contribution: RiskContributionResponse = Field(..., description="Risk contribution analysis")
+    correlation: CorrelationResponse = Field(..., description="Asset correlation analysis")
+    efficient_frontier: EfficientFrontierResponse = Field(..., description="Efficient frontier analysis")
+    portfolio_metrics: PortfolioMetricsResponse = Field(..., description="Comprehensive portfolio metrics")
     
     class Config:
         json_encoders = {
