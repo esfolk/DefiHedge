@@ -168,3 +168,6 @@ dev-data/
 *.tfstate
 *.tfstate.*
 .terraform/
+
+# Coinbase CDP SDK (external)
+cdp-sdk/
