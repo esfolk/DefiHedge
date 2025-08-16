@@ -5,10 +5,28 @@ import { PortfolioDashboard } from '@/components/PortfolioDashboard';
 import { RiskAnalysisDashboard } from '@/components/RiskAnalysisDashboard';
 import { WalletConnection } from '@/../types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useCompleteRiskAnalysis } from '@/hooks/use-api';
+import { CompleteRiskAnalysisResponse } from '@/services/api';
 
 export default function Home() {
   const [walletConnection, setWalletConnection] = useState<WalletConnection | null>(null);
   const [activeTab, setActiveTab] = useState('portfolio');
+  
+  // Risk analysis hook for the current wallet
+  const riskAnalysis = useCompleteRiskAnalysis(walletConnection?.address || null);
+  
+  // Function to run live risk analysis
+  const handleRiskAnalysis = async (address: string): Promise<CompleteRiskAnalysisResponse | null> => {
+    try {
+      console.log('🔍 Starting live risk analysis for:', address);
+      const result = await riskAnalysis.execute();
+      console.log('✅ Risk analysis completed:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Risk analysis failed:', error);
+      throw error;
+    }
+  };
 
   return (
     <>
@@ -58,12 +76,9 @@ export default function Home() {
                 <TabsContent value="risk">
                   <RiskAnalysisDashboard 
                     walletAddress={walletConnection.address}
-                    onAnalyze={async (address) => {
-                      // This will use the mock data for now
-                      // In production, this would call the real API
-                      console.log('Analyzing portfolio for:', address);
-                      return null; // Let component use mock data
-                    }}
+                    onAnalyze={handleRiskAnalysis}
+                    isLoading={riskAnalysis.loading}
+                    initialData={riskAnalysis.data}
                   />
                 </TabsContent>
               </Tabs>

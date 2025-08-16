@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { PortfolioData, PriceData, Chain } from '@/../types';
-import api from '@/services/api';
+import api, {
+  CompleteRiskAnalysisResponse,
+  RiskContributionResponse,
+  CorrelationResponse,
+  EfficientFrontierResponse,
+  PortfolioMetricsResponse
+} from '@/services/api';
 
 // Generic hook for API calls with loading/error states
 export function useApiCall<T>(
@@ -203,4 +209,124 @@ export function useMultipleApiCalls() {
   }, [calls]);
 
   return { addCall, getCall, retryCall };
+}
+
+// Risk Analysis Hooks
+
+// Hook for complete risk analysis
+export function useCompleteRiskAnalysis(address: string | null, lookbackDays: number = 365) {
+  const apiCall = useCallback(async () => {
+    if (!address) throw new Error('No address provided');
+    return await api.riskAnalysis.getComplete(address, lookbackDays);
+  }, [address, lookbackDays]);
+
+  return useApiCall<CompleteRiskAnalysisResponse>(
+    apiCall,
+    [address, lookbackDays],
+    false // Don't execute immediately - wait for manual trigger
+  );
+}
+
+// Hook for risk contribution analysis
+export function useRiskContribution(address: string | null, lookbackDays: number = 365) {
+  const apiCall = useCallback(async () => {
+    if (!address) throw new Error('No address provided');
+    return await api.riskAnalysis.getRiskContribution(address, lookbackDays);
+  }, [address, lookbackDays]);
+
+  return useApiCall<RiskContributionResponse>(
+    apiCall,
+    [address, lookbackDays],
+    false // Don't execute immediately - wait for manual trigger
+  );
+}
+
+// Hook for correlation analysis
+export function useCorrelationAnalysis(address: string | null, lookbackDays: number = 365) {
+  const apiCall = useCallback(async () => {
+    if (!address) throw new Error('No address provided');
+    return await api.riskAnalysis.getCorrelation(address, lookbackDays);
+  }, [address, lookbackDays]);
+
+  return useApiCall<CorrelationResponse>(
+    apiCall,
+    [address, lookbackDays],
+    false // Don't execute immediately - wait for manual trigger
+  );
+}
+
+// Hook for efficient frontier analysis
+export function useEfficientFrontier(address: string | null, lookbackDays: number = 365) {
+  const apiCall = useCallback(async () => {
+    if (!address) throw new Error('No address provided');
+    return await api.riskAnalysis.getEfficientFrontier(address, lookbackDays);
+  }, [address, lookbackDays]);
+
+  return useApiCall<EfficientFrontierResponse>(
+    apiCall,
+    [address, lookbackDays],
+    false // Don't execute immediately - wait for manual trigger
+  );
+}
+
+// Combined hook for all risk analysis operations
+export function useRiskAnalysisManager(address: string | null, lookbackDays: number = 365) {
+  const completeAnalysis = useCompleteRiskAnalysis(address, lookbackDays);
+  const riskContribution = useRiskContribution(address, lookbackDays);
+  const correlation = useCorrelationAnalysis(address, lookbackDays);
+  const efficientFrontier = useEfficientFrontier(address, lookbackDays);
+
+  const runCompleteAnalysis = useCallback(async () => {
+    if (!address) return null;
+    try {
+      return await completeAnalysis.execute();
+    } catch (error) {
+      console.error('Complete risk analysis failed:', error);
+      throw error;
+    }
+  }, [address, completeAnalysis.execute]);
+
+  const runRiskContribution = useCallback(async () => {
+    if (!address) return null;
+    return await riskContribution.execute();
+  }, [address, riskContribution.execute]);
+
+  const runCorrelation = useCallback(async () => {
+    if (!address) return null;
+    return await correlation.execute();
+  }, [address, correlation.execute]);
+
+  const runEfficientFrontier = useCallback(async () => {
+    if (!address) return null;
+    return await efficientFrontier.execute();
+  }, [address, efficientFrontier.execute]);
+
+  const isAnyLoading = completeAnalysis.loading || riskContribution.loading || correlation.loading || efficientFrontier.loading;
+  const hasAnyError = completeAnalysis.error || riskContribution.error || correlation.error || efficientFrontier.error;
+
+  return {
+    // Individual analysis results
+    completeAnalysis,
+    riskContribution,
+    correlation,
+    efficientFrontier,
+    
+    // Combined execution functions
+    runCompleteAnalysis,
+    runRiskContribution,
+    runCorrelation,
+    runEfficientFrontier,
+    
+    // Combined state
+    isAnyLoading,
+    hasAnyError,
+    
+    // Utility functions
+    retryAll: () => {
+      completeAnalysis.retry();
+      riskContribution.retry();
+      correlation.retry();
+      efficientFrontier.retry();
+    }
+  };
 }

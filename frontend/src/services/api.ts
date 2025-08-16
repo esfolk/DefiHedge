@@ -49,6 +49,86 @@ export interface APIError {
   timestamp: string;
 }
 
+// Risk Analysis API interfaces matching backend models
+export interface RiskContributionData {
+  asset: string;
+  risk_contribution: number;
+  portfolio_weight: number;
+}
+
+export interface RiskContributionResponse {
+  data: RiskContributionData[];
+  total_portfolio_risk: number;
+  analysis_date: string;
+}
+
+export interface CorrelationData {
+  asset1: string;
+  asset2: string;
+  correlation: number;
+}
+
+export interface CorrelationSummary {
+  average_correlation: number;
+  max_correlation: number;
+  min_correlation: number;
+  diversification_ratio: number;
+}
+
+export interface CorrelationResponse {
+  data: CorrelationData[];
+  assets: string[];
+  summary: CorrelationSummary;
+  analysis_date: string;
+}
+
+export interface FrontierPoint {
+  return: number;
+  risk: number;
+  sharpe_ratio: number;
+}
+
+export interface PortfolioPoint {
+  return: number;
+  risk: number;
+  sharpe_ratio: number;
+}
+
+export interface OptimalPortfolios {
+  max_sharpe: PortfolioPoint;
+  min_volatility: PortfolioPoint;
+}
+
+export interface EfficientFrontierResponse {
+  frontier_points: FrontierPoint[];
+  current_portfolio: PortfolioPoint;
+  optimal_portfolios: OptimalPortfolios;
+  analysis_date: string;
+}
+
+export interface PortfolioMetricsResponse {
+  annual_return: number;
+  annual_volatility: number;
+  sharpe_ratio: number;
+  var_95: number;
+  max_drawdown: number;
+  calmar_ratio: number;
+  sortino_ratio: number;
+  analysis_period_days: number;
+  analysis_date: string;
+}
+
+export interface CompleteRiskAnalysisResponse {
+  risk_contribution: RiskContributionResponse;
+  correlation: CorrelationResponse;
+  efficient_frontier: EfficientFrontierResponse;
+  portfolio_metrics: PortfolioMetricsResponse;
+}
+
+export interface RiskAnalysisRequest {
+  lookback_days?: number;
+}
+
 class APIClient {
   private client: AxiosInstance;
   private baseURL: string;
@@ -193,6 +273,51 @@ class APIClient {
       return false;
     }
   }
+
+  // Risk Analysis endpoints
+  async getCompleteRiskAnalysis(address: string, lookbackDays: number = 365): Promise<CompleteRiskAnalysisResponse> {
+    const params = new URLSearchParams();
+    if (lookbackDays !== 365) {
+      params.append('lookback_days', lookbackDays.toString());
+    }
+    
+    const url = `/portfolio/${address}/risk-analysis${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await this.client.post<CompleteRiskAnalysisResponse>(url);
+    return response.data;
+  }
+
+  async getRiskContribution(address: string, lookbackDays: number = 365): Promise<RiskContributionResponse> {
+    const params = new URLSearchParams();
+    if (lookbackDays !== 365) {
+      params.append('lookback_days', lookbackDays.toString());
+    }
+    
+    const url = `/portfolio/${address}/risk-contribution${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await this.client.post<RiskContributionResponse>(url);
+    return response.data;
+  }
+
+  async getCorrelationAnalysis(address: string, lookbackDays: number = 365): Promise<CorrelationResponse> {
+    const params = new URLSearchParams();
+    if (lookbackDays !== 365) {
+      params.append('lookback_days', lookbackDays.toString());
+    }
+    
+    const url = `/portfolio/${address}/correlation${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await this.client.post<CorrelationResponse>(url);
+    return response.data;
+  }
+
+  async getEfficientFrontier(address: string, lookbackDays: number = 365): Promise<EfficientFrontierResponse> {
+    const params = new URLSearchParams();
+    if (lookbackDays !== 365) {
+      params.append('lookback_days', lookbackDays.toString());
+    }
+    
+    const url = `/portfolio/${address}/efficient-frontier${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await this.client.post<EfficientFrontierResponse>(url);
+    return response.data;
+  }
 }
 
 // Create singleton instance
@@ -226,6 +351,14 @@ export const api = {
   // Debug operations (dev only)
   debug: {
     test: () => apiClient.getDebugTest(),
+  },
+
+  // Risk analysis operations
+  riskAnalysis: {
+    getComplete: (address: string, lookbackDays?: number) => apiClient.getCompleteRiskAnalysis(address, lookbackDays),
+    getRiskContribution: (address: string, lookbackDays?: number) => apiClient.getRiskContribution(address, lookbackDays),
+    getCorrelation: (address: string, lookbackDays?: number) => apiClient.getCorrelationAnalysis(address, lookbackDays),
+    getEfficientFrontier: (address: string, lookbackDays?: number) => apiClient.getEfficientFrontier(address, lookbackDays),
   },
 
   // Utility

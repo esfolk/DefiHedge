@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
@@ -9,81 +9,16 @@ import { CorrelationHeatmap } from './CorrelationHeatmap'
 import { EfficientFrontierChart } from './EfficientFrontierChart'
 import { RefreshCcw, AlertTriangle, TrendingUp, Shield, Target } from 'lucide-react'
 
-// Type definitions for the complete risk analysis response
-interface RiskContributionData {
-  asset: string
-  risk_contribution: number
-  portfolio_weight: number
-}
+import {
+  CompleteRiskAnalysisResponse,
+  RiskContributionResponse,
+  CorrelationResponse,
+  EfficientFrontierResponse,
+  PortfolioMetricsResponse
+} from '@/services/api';
 
-interface RiskContributionResponse {
-  data: RiskContributionData[]
-  total_portfolio_risk: number
-  analysis_date: string
-}
-
-interface CorrelationData {
-  asset1: string
-  asset2: string
-  correlation: number
-}
-
-interface CorrelationSummary {
-  average_correlation: number
-  max_correlation: number
-  min_correlation: number
-  diversification_ratio: number
-}
-
-interface CorrelationResponse {
-  data: CorrelationData[]
-  assets: string[]
-  summary: CorrelationSummary
-  analysis_date: string
-}
-
-interface FrontierPoint {
-  return: number
-  risk: number
-  sharpe_ratio: number
-}
-
-interface PortfolioPoint {
-  return: number
-  risk: number
-  sharpe_ratio: number
-}
-
-interface OptimalPortfolios {
-  max_sharpe: PortfolioPoint
-  min_volatility: PortfolioPoint
-}
-
-interface EfficientFrontierResponse {
-  frontier_points: FrontierPoint[]
-  current_portfolio: PortfolioPoint
-  optimal_portfolios: OptimalPortfolios
-  analysis_date: string
-}
-
-interface PortfolioMetricsResponse {
-  annual_return: number
-  annual_volatility: number
-  sharpe_ratio: number
-  var_95: number
-  max_drawdown: number
-  calmar_ratio: number
-  sortino_ratio: number
-  analysis_period_days: number
-  analysis_date: string
-}
-
-interface CompleteRiskAnalysis {
-  risk_contribution: RiskContributionResponse
-  correlation: CorrelationResponse
-  efficient_frontier: EfficientFrontierResponse
-  portfolio_metrics: PortfolioMetricsResponse
-}
+// Type alias for compatibility
+type CompleteRiskAnalysis = CompleteRiskAnalysisResponse;
 
 interface RiskAnalysisDashboardProps {
   walletAddress: string
@@ -182,6 +117,13 @@ export function RiskAnalysisDashboard({
   const [analysisData, setAnalysisData] = useState<CompleteRiskAnalysis | null>(initialData)
   const [activeTab, setActiveTab] = useState<'overview' | 'risk' | 'correlation' | 'frontier'>('overview')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+
+  // Update analysis data when initialData changes
+  useEffect(() => {
+    if (initialData) {
+      setAnalysisData(initialData);
+    }
+  }, [initialData]);
 
   const handleAnalyze = async () => {
     if (!onAnalyze) {
